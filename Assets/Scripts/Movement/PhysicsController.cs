@@ -110,6 +110,10 @@ public class PhysicsController : MonoBehaviour
     public float groundCheckDistance = 0.1f;
     public float maxGroundAngle = 45f;
     
+    [Header("Ground Movement")]
+    public bool autoSlopeHandling = true;
+    public float groundSnapDistance = 0.3f;
+    
     // Components
     private CapsuleCollider col;
     
@@ -300,31 +304,56 @@ public class PhysicsController : MonoBehaviour
             attemptedMovement = motion,
             collisions = new List<CollisionInfo>()
         };
-        
+
+        // --- AUTO SLOPE HANDLING ---
+        if (autoSlopeHandling && groundInfo.isGrounded)
+        {
+            Vector3 horizontal = new Vector3(motion.x, 0f, motion.z);
+
+            if (horizontal.sqrMagnitude > 0.0001f && groundInfo.isOnSlope)
+            {
+                Vector3 projected = Vector3.ProjectOnPlane(horizontal, groundInfo.normal);
+                motion = projected.normalized * horizontal.magnitude;
+            }
+            else if (horizontal.sqrMagnitude > 0.0001f)
+            {
+                motion = horizontal;
+            }
+            else
+            {
+                motion = Vector3.zero;
+            }
+        }
+        // --- END SLOPE HANDLING ---
+
         if (motion.sqrMagnitude < 0.00001f)
         {
+            if (autoSlopeHandling && groundInfo.isGrounded)
+            {
+                SnapToGround(groundSnapDistance);
+            }
             result.endPosition = transform.position;
             result.actualMovement = Vector3.zero;
             return result;
         }
-        
+
         Vector3 remainingMotion = motion;
-        
+
         for (int i = 0; i < maxMoveIterations && remainingMotion.sqrMagnitude > 0.0001f; i++)
         {
             float distance = remainingMotion.magnitude;
             Vector3 direction = remainingMotion.normalized;
-            
+
             float radius = col.radius - skinWidth;
             Vector3 bottom = GetCapsulePoint(false);
             Vector3 top = GetCapsulePoint(true);
-            
+
             if (Physics.CapsuleCast(bottom, top, radius, direction, out RaycastHit hit, distance + skinWidth, collisionMask, QueryTriggerInteraction.Ignore))
             {
                 // Move to just before the hit
                 float safeDistance = Mathf.Max(0, hit.distance - skinWidth);
                 transform.position += direction * safeDistance;
-                
+
                 // Record collision
                 CollisionInfo collision = new CollisionInfo
                 {
@@ -337,11 +366,11 @@ public class PhysicsController : MonoBehaviour
                 };
                 result.collisions.Add(collision);
                 frameCollisions.Add(collision);
-                
+
                 // Calculate remaining motion (slide along surface)
                 float usedDistance = safeDistance;
                 float leftoverDistance = distance - usedDistance;
-                
+
                 if (leftoverDistance > 0.001f)
                 {
                     Vector3 leftoverMotion = direction * leftoverDistance;
@@ -351,7 +380,7 @@ public class PhysicsController : MonoBehaviour
                 {
                     remainingMotion = Vector3.zero;
                 }
-                
+
                 result.collided = true;
             }
             else
@@ -361,13 +390,20 @@ public class PhysicsController : MonoBehaviour
                 remainingMotion = Vector3.zero;
             }
         }
-        
+
         // Resolve any overlaps
         ResolveOverlaps(result.collisions);
-        
+
+        // --- GROUND SNAP ---
+        if (autoSlopeHandling && groundInfo.isGrounded)
+        {
+            SnapToGround(groundSnapDistance);
+        }
+        // --- END GROUND SNAP ---
+
         result.endPosition = transform.position;
         result.actualMovement = result.endPosition - result.startPosition;
-        
+
         return result;
     }
     
