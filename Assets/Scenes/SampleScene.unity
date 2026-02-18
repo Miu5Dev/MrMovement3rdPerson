@@ -1291,13 +1291,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c817d42b18188747a9b4911a5d95c9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gravity: -20
-  maxFallSpeed: -50
   skinWidth: 0.01
-  maxCollisionIterations: 3
-  groundCheckDistance: 0.1
+  maxMoveIterations: 3
+  maxOverlapIterations: 3
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckDistance: 0.2
+  maxGroundAngle: 45
+  autoSlopeHandling: 1
   groundSnapDistance: 0.3
-  maxSlopeAngle: 45
 --- !u!136 &518151366
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -1333,9 +1336,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2c434cc5561f2914c956eafd51ea8f29, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveDirection: {x: 0, y: 0, z: 0}
-  moveSpeed: 5
-  physics: {fileID: 0}
+  Gravity: -9.81
+  MovingSpeed: 12
+  MinStartSpeed: 3
+  Acceleration: 20
+  Deceleration: 50
+  AirMovingSpeed: 4
+  AirAcceleration: 5
+  AirDeceleration: 3
+  AirDragDeceleration: 2.5
+  RotationSpeed: 15
+  AirRotationSpeed: 8
+  GroundedDebug: 0
+  ActionDebug: 0
+  JumpDebug: 0
+  CrouchDebug: 0
+  SwapDebug: 0
+  DirectionDebug: {x: 0, y: 0}
+  VelocityDebug: {x: 0, y: 0, z: 0}
 --- !u!1 &529018895
 GameObject:
   m_ObjectHideFlags: 0
