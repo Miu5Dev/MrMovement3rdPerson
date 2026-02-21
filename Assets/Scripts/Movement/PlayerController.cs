@@ -2,26 +2,39 @@ using System;
 using UnityEngine;
 
 [RequireComponent(typeof(PhysicsController))]
-public class PlayerController : MonoBehaviour
+public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
 {
   //Requirements
   PhysicsController physics;
   
+  [Header("Gravity Settings")]
   //Configurable Constants
   public float Gravity = -9.81f;
-  [Space(7)]
+  [Space(20)]
+  [Header("Grounded Settings")]
   public float MovingSpeed = 12f;
   public float MinStartSpeed = 3f;
   public float Acceleration = 10f;
   public float Deceleration = 15f;
-
+  
+  [Space(20)]
+  [Header("Airbounded Settings")]
   public float AirMovingSpeed = 4f;
   public float AirAcceleration = 2f;      
   public float AirDeceleration = 1.5f;     
   public float AirDragDeceleration = 0.8f;
   
+  [Space(20)]
+  [Header("Rotation Settings")]
   public float RotationSpeed = 15f;
   public float AirRotationSpeed = 8f;
+  
+  [Space(20)]
+  [Header("Jump Settings")]
+  public float JumpForce = 10f;
+  public float CoyoteTime = 0.12f;        
+  public float JumpBufferTime = 0.1f;     
+  
   
   //Private Variables
   private Vector3 Velocity;
@@ -35,16 +48,23 @@ public class PlayerController : MonoBehaviour
   private bool isSwap;
   private Vector2 Direction;
   
+  private float coyoteTimer;
+  private float jumpBufferTimer;
+  private bool hasJumped;
+  
   //Debug
-  [Space(20)]
-  [Header("DEBUG")] 
+  [Space(40)]
+  [Header("------------ DEBUG ---------------------------------------------------------")] 
   public bool GroundedDebug = false;
   public bool ActionDebug = false;
   public bool JumpDebug = false;
   public bool CrouchDebug = false;
   public bool SwapDebug = false;
+  [Space(10)] 
+  public float speedDebug;
+  [Space(10)]
   public Vector2 DirectionDebug;
-  [Space(5)]
+  [Space(10)]
   public Vector3 VelocityDebug;
   
   //Connect Physics
@@ -69,14 +89,48 @@ public class PlayerController : MonoBehaviour
   {
     HandleGrounded();
     HandleGravity();
+    HandleJump();
     HandleMovement();
     HandleRotation();
     HandleMotion();
     HandleDebug();
   }
+
+  private void HandleJump()
+  {
+    // Coyote time: cuenta regresiva desde que dejamos el suelo
+    if (isGrounded)
+    {
+      coyoteTimer = CoyoteTime;
+      hasJumped = false;
+    }
+    else
+    {
+      coyoteTimer -= Time.deltaTime;
+    }
+
+    // Jump buffer: el jugador presionó saltar recientemente
+    if (isJump)
+      jumpBufferTimer = JumpBufferTime;
+    else
+      jumpBufferTimer -= Time.deltaTime;
+
+    // Ejecutar salto si se cumplen las condiciones
+    bool canJump = coyoteTimer > 0f && !hasJumped;
+
+    if (jumpBufferTimer > 0f && canJump)
+    {
+      Velocity.y = JumpForce;
+      hasJumped = true;
+      coyoteTimer = 0f;
+      jumpBufferTimer = 0f;
+    }
+  }
   
   private void HandleRotation()
   {
+    if(!isGrounded) return;
+    
     // Solo rotar si hay movimiento horizontal
     Vector3 horizontalVelocity = new Vector3(Velocity.x, 0f, Velocity.z);
     if (horizontalVelocity.sqrMagnitude < 0.01f) return;
@@ -208,6 +262,7 @@ public class PlayerController : MonoBehaviour
     SwapDebug = isSwap;
     DirectionDebug = Direction;
     VelocityDebug = Velocity;
+    speedDebug = new Vector2(Velocity.x,Velocity.z).magnitude;
   }
   
   

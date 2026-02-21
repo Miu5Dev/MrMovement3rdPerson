@@ -308,20 +308,29 @@ public class PhysicsController : MonoBehaviour
         // --- AUTO SLOPE HANDLING ---
         if (autoSlopeHandling && groundInfo.isGrounded)
         {
-            Vector3 horizontal = new Vector3(motion.x, 0f, motion.z);
-
-            if (horizontal.sqrMagnitude > 0.0001f && groundInfo.isOnSlope)
+            // Si motion.y es positivo, es un salto → no manipular
+            if (motion.y > 0.001f)
             {
-                Vector3 projected = Vector3.ProjectOnPlane(horizontal, groundInfo.normal);
-                motion = projected.normalized * horizontal.magnitude;
-            }
-            else if (horizontal.sqrMagnitude > 0.0001f)
-            {
-                motion = horizontal;
+                // Salto: dejamos motion intacto, desactivamos snap este frame
+                // No hacemos nada, motion pasa tal cual
             }
             else
             {
-                motion = Vector3.zero;
+                Vector3 horizontal = new Vector3(motion.x, 0f, motion.z);
+
+                if (horizontal.sqrMagnitude > 0.0001f && groundInfo.isOnSlope)
+                {
+                    Vector3 projected = Vector3.ProjectOnPlane(horizontal, groundInfo.normal);
+                    motion = projected.normalized * horizontal.magnitude;
+                }
+                else if (horizontal.sqrMagnitude > 0.0001f)
+                {
+                    motion = horizontal;
+                }
+                else
+                {
+                    motion = Vector3.zero;
+                }
             }
         }
         // --- END SLOPE HANDLING ---
@@ -348,13 +357,12 @@ public class PhysicsController : MonoBehaviour
             Vector3 bottom = GetCapsulePoint(false);
             Vector3 top = GetCapsulePoint(true);
 
-            if (Physics.CapsuleCast(bottom, top, radius, direction, out RaycastHit hit, distance + skinWidth, collisionMask, QueryTriggerInteraction.Ignore))
+            if (Physics.CapsuleCast(bottom, top, radius, direction, out RaycastHit hit,
+                distance + skinWidth, collisionMask, QueryTriggerInteraction.Ignore))
             {
-                // Move to just before the hit
                 float safeDistance = Mathf.Max(0, hit.distance - skinWidth);
                 transform.position += direction * safeDistance;
 
-                // Record collision
                 CollisionInfo collision = new CollisionInfo
                 {
                     hit = true,
@@ -367,7 +375,6 @@ public class PhysicsController : MonoBehaviour
                 result.collisions.Add(collision);
                 frameCollisions.Add(collision);
 
-                // Calculate remaining motion (slide along surface)
                 float usedDistance = safeDistance;
                 float leftoverDistance = distance - usedDistance;
 
@@ -385,17 +392,15 @@ public class PhysicsController : MonoBehaviour
             }
             else
             {
-                // No collision, move full distance
                 transform.position += remainingMotion;
                 remainingMotion = Vector3.zero;
             }
         }
 
-        // Resolve any overlaps
         ResolveOverlaps(result.collisions);
 
-        // --- GROUND SNAP ---
-        if (autoSlopeHandling && groundInfo.isGrounded)
+        // --- GROUND SNAP: solo si NO estamos saltando ---
+        if (autoSlopeHandling && groundInfo.isGrounded && motion.y <= 0.001f)
         {
             SnapToGround(groundSnapDistance);
         }
