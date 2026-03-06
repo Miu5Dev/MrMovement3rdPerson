@@ -2,10 +2,6 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>
-/// Handles all input and raises events through the EventBus.
-/// Fixed to properly support controllers with continuous input.
-/// </summary>
 public class InputSystem : MonoBehaviour
 {
     private MyInputs inputs;
@@ -18,9 +14,8 @@ public class InputSystem : MonoBehaviour
         inputs.Player.Move.performed += OnMovePerformed;
         inputs.Player.Move.canceled += OnMoveCanceled;
         
-        // Look
-        inputs.Player.Look.performed += OnLookPerformed;
-        inputs.Player.Look.canceled += OnLookCanceled;
+        // Look - ya NO se usa performed/canceled
+        // Se lee en Update cada frame
         
         // Button inputs
         inputs.Player.Action.performed += OnActionInput;
@@ -45,7 +40,17 @@ public class InputSystem : MonoBehaviour
         inputs.Player.Disable();
     }
 
-    
+    void Update()
+    {
+        // Leer look input cada frame para que el stick analógico funcione
+        Vector2 lookValue = inputs.Player.Look.ReadValue<Vector2>();
+        EventBus.Raise(new OnLookInputEvent()
+        {
+            pressed = lookValue.sqrMagnitude > 0.01f,
+            Delta = lookValue
+        });
+    }
+
     // ========================================================================
     // MOVEMENT INPUT
     // ========================================================================
@@ -65,28 +70,6 @@ public class InputSystem : MonoBehaviour
         {
             pressed = context.performed,
             Direction = context.ReadValue<Vector2>()
-        });
-    }
-    
-    // ========================================================================
-    // LOOK INPUT
-    // ========================================================================
-    
-    private void OnLookPerformed(InputAction.CallbackContext context)
-    {
-        EventBus.Raise(new OnLookInputEvent()
-        {
-            pressed = context.performed,
-            Delta = context.ReadValue<Vector2>()
-        });
-    }
-    
-    private void OnLookCanceled(InputAction.CallbackContext context)
-    {
-        EventBus.Raise(new OnLookInputEvent()
-        {
-            pressed = context.performed,
-            Delta = context.ReadValue<Vector2>()
         });
     }
     

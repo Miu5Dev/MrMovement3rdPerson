@@ -17,7 +17,7 @@ public class AnimationController : MonoBehaviour    //REMPLACE WITH STATE SYSTEN
 
     public void Update()
     {
-        if (controller.speedDebug > 0)
+        if (controller.speedDebug > 1.6f)
         {
             animator.SetBool("moving", true);
         }
