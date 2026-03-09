@@ -2,16 +2,14 @@ using System;
 using UnityEngine;
 
 [RequireComponent(typeof(PhysicsController))]
-public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
+public class PlayerController : MonoBehaviour
 {
-  //Requirements
   PhysicsController physics;
   
   [Header("Camera Settings")]
   public Transform CameraTransform;
   
   [Header("Gravity Settings")]
-  //Configurable Constants
   public float Gravity = -9.81f;
   [Space(20)]
   [Header("Grounded Settings")]
@@ -35,53 +33,39 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
   [Space(20)]
   [Header("Jump Settings")]
   public float JumpForce = 10f;
+  public float MinJumpForce = 4f;
   public float CoyoteTime = 0.12f;        
   public float JumpBufferTime = 0.1f;     
 
   [Space(20)]
   [Header("Curve Turn Settings")]
-  [Tooltip("Velocidad de interpolación de la dirección suavizada")]
   public float CurveTurnSpeed = 5f;
-  [Tooltip("Ángulo a partir del cual se considera reversa total (sin suavizado)")]
   public float ReversalAngle = 150f;
 
   [Space(20)]
   [Header("Air Rotation Lock Settings")]
-  [Tooltip("Ángulo entre la dirección de despegue y el input para bloquear rotación en aire")]
   public float AirReversalLockAngle = 120f;
   
-  
-  //Private Variables
   private Vector3 Velocity;
   private bool isGrounded;
-  
   private bool isOnSteepSlope;
-
   private bool isAction;
   private bool isJump;
   private bool isCrouch;
   private bool isSwap;
   private Vector2 Direction;
-  
   private float coyoteTimer;
   private float jumpBufferTimer;
   private bool hasJumped;
-
-  // Curve turn state
   private Vector2 smoothedDirection;
-
-  // Air rotation lock state
   private bool airRotationLocked;
   private Quaternion lockedRotation;
   private Vector3 takeoffDirection;
-
-  // Dry jump state
   private bool isDryJump;
-
-  // Camera relative input
   private Vector2 cameraRelativeDirection;
+  private bool jumpHeld;
+  private bool jumpCut;
   
-  //Debug
   [Space(40)]
   [Header("------------ DEBUG ---------------------------------------------------------")] 
   public bool GroundedDebug = false;
@@ -98,13 +82,11 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
   [Space(10)]
   public bool DryJumpDebug = false;
   
-  //Connect Physics
   void Awake() 
   {
     physics = GetComponent<PhysicsController>();
   }
 
-  //Connect Input
   void Start()
   {
     if (CameraTransform == null && Camera.main != null)
@@ -112,16 +94,25 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
 
     EventBus.Subscribe<OnActionInputEvent>(@event => isAction = @event.pressed);
     EventBus.Subscribe<OnCrouchInputEvent>(@event => isCrouch = @event.pressed);
-    EventBus.Subscribe<OnJumpInputEvent>(@event => isJump = @event.pressed);
+    EventBus.Subscribe<OnJumpInputEvent>(OnJumpInput);
     EventBus.Subscribe<OnSwapInputEvent>(@event => isSwap = @event.pressed);
     EventBus.Subscribe<OnMoveInputEvent>(@event => Direction = @event.Direction);
   }
 
-
-  //Do Update Stuff
-  void Update()
+  private void OnJumpInput(OnJumpInputEvent evt)
   {
-    // Input se captura via EventBus
+    if (evt.pressed)
+    {
+      isJump = true;
+      jumpHeld = true;
+    }
+    else
+    {
+      isJump = false;
+      jumpHeld = false;
+      if (!isGrounded && Velocity.y > 0f && hasJumped)
+        jumpCut = true;
+    }
   }
 
   void FixedUpdate()
@@ -130,12 +121,18 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
     HandleGrounded();
     HandleGravity();
     HandleJump();
+    HandleVariableJump();
     HandleMovement();
     HandleRotation();
     HandleMotion();
     HandleDebug();
   }
 
+  // ========================================================================
+  // Forward = dirección cámara → jugador (horizontal, normalizada)
+  // Esto es lo que permite el orbiting: como la cámara tiene lag,
+  // este vector cambia cada frame cuando el jugador se mueve lateral.
+  // ========================================================================
   private void HandleCameraRelativeInput()
   {
     if (Direction.sqrMagnitude < 0.01f || CameraTransform == null)
@@ -144,19 +141,20 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
       return;
     }
 
-    // Obtener forward y right de la cámara, aplanados en Y
-    Vector3 camForward = CameraTransform.forward;
-    Vector3 camRight = CameraTransform.right;
+    Vector3 forward = transform.position - CameraTransform.position;
+    forward.y = 0f;
 
-    camForward.y = 0f;
-    camRight.y = 0f;
-    camForward.Normalize();
-    camRight.Normalize();
+    if (forward.sqrMagnitude < 0.01f)
+    {
+      cameraRelativeDirection = Vector2.zero;
+      return;
+    }
 
-    // Convertir input a dirección relativa a la cámara
-    Vector3 worldDirection = camForward * Direction.y + camRight * Direction.x;
+    forward.Normalize();
+    Vector3 right = new Vector3(forward.z, 0f, -forward.x);
 
-    cameraRelativeDirection = new Vector2(worldDirection.x, worldDirection.z);
+    Vector3 world = forward * Direction.y + right * Direction.x;
+    cameraRelativeDirection = new Vector2(world.x, world.z);
 
     if (cameraRelativeDirection.sqrMagnitude > 1f)
       cameraRelativeDirection.Normalize();
@@ -177,6 +175,7 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
       coyoteTimer = CoyoteTime;
       hasJumped = false;
       isDryJump = false;
+      jumpCut = false;
     }
     else
     {
@@ -204,13 +203,22 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
       }
 
       isDryJump = !hasDirection && !hasSpeed;
-
       takeoffDirection = new Vector3(Velocity.x, 0f, Velocity.z).normalized;
 
       Velocity.y = JumpForce;
       hasJumped = true;
+      jumpCut = false;
       coyoteTimer = 0f;
       jumpBufferTimer = 0f;
+    }
+  }
+
+  private void HandleVariableJump()
+  {
+    if (jumpCut && Velocity.y > 0f)
+    {
+      Velocity.y = Mathf.Min(Velocity.y, MinJumpForce);
+      jumpCut = false;
     }
   }
   
@@ -221,17 +229,13 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
     if (isGrounded)
     {
       airRotationLocked = false;
-
       if (horizontalVelocity.sqrMagnitude < 0.01f) return;
-
       Quaternion targetRotation = Quaternion.LookRotation(horizontalVelocity.normalized);
       transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, RotationSpeed * Time.fixedDeltaTime);
       return;
     }
 
-    if (isDryJump)
-      return;
-
+    if (isDryJump) return;
     if (horizontalVelocity.sqrMagnitude < 0.01f) return;
 
     if (!airRotationLocked && takeoffDirection.sqrMagnitude > 0.01f)
@@ -274,7 +278,6 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
           if (dot < 0f)
             Velocity -= normal * dot;
         }
-            
         if (collision.angle >= 135f && Velocity.y > 0f)
           Velocity.y = 0f;
       }
@@ -369,10 +372,8 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
     {
       if (Mathf.Sign(current) == Mathf.Sign(target) || Mathf.Approximately(target, 0f))
         return AirDragDeceleration;
-
       return decel;
     }
-
     return IsApproachingTarget(current, target) ? accel : decel;
   }
 
@@ -403,26 +404,4 @@ public class PlayerController : MonoBehaviour //ADD STATE SYSTEM FOR ANIMATIONS
     speedDebug = new Vector2(Velocity.x,Velocity.z).magnitude;
     DryJumpDebug = isDryJump;
   }
-
- /* private void OnDrawGizmos()
-  {
-    if (!Application.isPlaying) return;
-
-    Vector3 start = transform.position + Vector3.up * 2f;
-    Vector3 end = start + Vector3.up * (Velocity.y * 0.2f);
-
-    if (Velocity.y > 0f)
-      Gizmos.color = Color.green;
-    else if (Velocity.y < -5f)
-      Gizmos.color = Color.red;
-    else
-      Gizmos.color = Color.yellow;
-
-    Gizmos.DrawLine(start, end);
-    Gizmos.DrawSphere(end, 0.1f);
-
-#if UNITY_EDITOR
-    UnityEditor.Handles.Label(start + Vector3.right * 0.3f, $"VelY: {Velocity.y:F2}");
-#endif
-  }*/
 }

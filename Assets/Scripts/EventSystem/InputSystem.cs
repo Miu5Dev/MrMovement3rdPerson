@@ -5,6 +5,7 @@ using UnityEngine.InputSystem;
 public class InputSystem : MonoBehaviour
 {
     private MyInputs inputs;
+    private LookInputSource currentLookSource = LookInputSource.Mouse;
 
     private void Awake()
     {
@@ -13,10 +14,10 @@ public class InputSystem : MonoBehaviour
         // Movement
         inputs.Player.Move.performed += OnMovePerformed;
         inputs.Player.Move.canceled += OnMoveCanceled;
-        
-        // Look - ya NO se usa performed/canceled
-        // Se lee en Update cada frame
-        
+
+        // Look — detectar dispositivo en performed para saber cuál está activo
+        inputs.Player.Look.performed += OnLookDeviceDetect;
+
         // Button inputs
         inputs.Player.Action.performed += OnActionInput;
         inputs.Player.Action.canceled += OnActionInput;
@@ -26,7 +27,7 @@ public class InputSystem : MonoBehaviour
         inputs.Player.Crouch.canceled += OnCrouchInput;
         inputs.Player.Swap.performed += OnSwapInput;
         inputs.Player.Swap.canceled += OnSwapInput;
-        
+
         Debug.Log("[InputSystem] Initialized");
     }
 
@@ -40,21 +41,32 @@ public class InputSystem : MonoBehaviour
         inputs.Player.Disable();
     }
 
+    private void OnLookDeviceDetect(InputAction.CallbackContext context)
+    {
+        // Detectar si el input viene de mouse o gamepad
+        var device = context.control.device;
+
+        if (device is Gamepad)
+            currentLookSource = LookInputSource.Gamepad;
+        else
+            currentLookSource = LookInputSource.Mouse;
+    }
+
     void Update()
     {
-        // Leer look input cada frame para que el stick analógico funcione
         Vector2 lookValue = inputs.Player.Look.ReadValue<Vector2>();
         EventBus.Raise(new OnLookInputEvent()
         {
             pressed = lookValue.sqrMagnitude > 0.01f,
-            Delta = lookValue
+            Delta = lookValue,
+            Source = currentLookSource
         });
     }
 
     // ========================================================================
     // MOVEMENT INPUT
     // ========================================================================
-    
+
     private void OnMovePerformed(InputAction.CallbackContext context)
     {
         EventBus.Raise(new OnMoveInputEvent()
@@ -63,7 +75,7 @@ public class InputSystem : MonoBehaviour
             Direction = context.ReadValue<Vector2>()
         });
     }
-    
+
     private void OnMoveCanceled(InputAction.CallbackContext context)
     {
         EventBus.Raise(new OnMoveInputEvent()
@@ -72,7 +84,7 @@ public class InputSystem : MonoBehaviour
             Direction = context.ReadValue<Vector2>()
         });
     }
-    
+
     // ========================================================================
     // BUTTON INPUTS
     // ========================================================================
@@ -100,7 +112,7 @@ public class InputSystem : MonoBehaviour
             pressed = context.performed
         });
     }
-    
+
     private void OnSwapInput(InputAction.CallbackContext context)
     {
         EventBus.Raise(new OnSwapInputEvent()

@@ -1338,7 +1338,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   CameraTransform: {fileID: 963194228}
-  Gravity: -14.5
+  Gravity: -54
   MovingSpeed: 12
   MinStartSpeed: 3
   Acceleration: 20
@@ -1349,7 +1349,8 @@ MonoBehaviour:
   AirDragDeceleration: 2.5
   RotationSpeed: 15
   AirRotationSpeed: 8
-  JumpForce: 10
+  JumpForce: 16
+  MinJumpForce: 4
   CoyoteTime: 0.12
   JumpBufferTime: 0.1
   CurveTurnSpeed: 5
@@ -1377,6 +1378,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animator: {fileID: 4509778233409221339}
+  CameraTransform: {fileID: 0}
+  MoveThreshold: 1.6
+  ForwardAngle: 30
+  CurrentState: 0
 --- !u!1 &529018895
 GameObject:
   m_ObjectHideFlags: 0
@@ -5366,20 +5371,23 @@ MonoBehaviour:
   Target: {fileID: 518151363}
   Distance: 6
   MinDistance: 2
-  MaxDistance: 10
   LookAtHeight: 1.2
-  HorizontalSensitivity: 150
-  VerticalSensitivity: 75
-  InvertY: 0
-  MinVerticalAngle: -20
-  MaxVerticalAngle: 60
   CollisionRadius: 0.3
   CollisionMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  AutoRotateDelay: 2
-  AutoRotateSpeed: 2
-  AutoRotateMinSpeed: 1
+  MouseSensX: 3
+  MouseSensY: 2
+  PadSensX: 150
+  PadSensY: 100
+  InvertY: 0
+  MinPitch: -20
+  MaxPitch: 60
+  YawFollowSpeed: 1.5
+  YawFollowMinSpeed: 1
+  SpeedLagAmount: 1.5
+  SpeedLagMinSpeed: 2
+  SpeedLagSmooth: 3
 --- !u!1 &1024372358
 GameObject:
   m_ObjectHideFlags: 0
@@ -10890,7 +10898,7 @@ Animator:
   m_GameObject: {fileID: 4509778233409221338}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 3233de9167a63b24bbe0e73f64938f5f, type: 2}
+  m_Controller: {fileID: 9100000, guid: 65923af5c91b2d949b2ce04c04a58a40, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
